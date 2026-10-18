@@ -1,0 +1,42 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: inventory-concurrency-locking
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/inventory
+    username: inventory
+    password: inventory
+    hikari:
+      pool-name: inventory-pool
+      # The contention scenarios run up to 64 workers against the same row, and
+      # every worker needs its own connection for the whole transaction. A pool
+      # smaller than the worker count turns lock contention into pool
+      # contention and the numbers stop meaning anything.
+      maximum-pool-size: 80
+      # Without this a worker that cannot get a connection waits 30 s and the
+      # scenario looks like a deadlock in the database.
+      connection-timeout: 10000
+
+  jpa:
+    # A lazy association resolved while the response is being written is a query
+    # outside the transaction that read the data -- and outside the row lock
+    # that protected it.
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.jdbc.batch_size: 50
+      hibernate.order_inserts: true
+      hibernate.order_updates: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+logging:
+  level:
+    root: INFO
+    org.hibernate.SQL: INFO

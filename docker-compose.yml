@@ -1,0 +1,41 @@
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: inventory
+      POSTGRES_USER: inventory
+      POSTGRES_PASSWORD: inventory
+    ports:
+      # 5432 is free on this machine; the user's own containers publish 27017,
+      # 8083 and 4873.
+      - "5432:5432"
+    command:
+      - "postgres"
+      # The contention scenarios open one connection per worker thread and push
+      # dozens of concurrent transactions at the same row, so the server needs
+      # headroom well above the default 100.
+      - "-c"
+      - "max_connections=300"
+      # A pessimistic lock on PostgreSQL waits forever by default. Two seconds
+      # turns a livelock in a scenario into a visible error (55P03) instead of a
+      # hung request.
+      - "-c"
+      - "lock_timeout=2000"
+      # Deadlocks are one of the things this project demonstrates on purpose;
+      # logging them keeps the server side of the story in the log next to the
+      # 40P01 the application sees.
+      - "-c"
+      - "log_lock_waits=on"
+      - "-c"
+      - "deadlock_timeout=200"
+    volumes:
+      - inventory-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inventory -d inventory"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  inventory-pgdata:
